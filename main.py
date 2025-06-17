@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Union
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -22,6 +23,9 @@ logger = logging.getLogger(__name__)
 set_log_level("INFO")
 
 app = FastAPI(title="Gemini API FastAPI Server")
+
+# Load environment variables from a .env file if present
+load_dotenv()
 
 # Add CORS middleware
 app.add_middleware(
@@ -197,7 +201,7 @@ async def list_models():
         }
         for m in Model
     ]
-    print(data)
+    logger.debug(f"Model list: {data}")
     return {"object": "list", "data": data}
 
 
