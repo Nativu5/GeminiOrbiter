@@ -68,10 +68,10 @@ class SingletonGeminiClient(GeminiClient, metaclass=Singleton):
         return model_input, files
 
     @staticmethod
-    async def precess_conversation(messages: list[Message], tempdir: Path | None = None):
+    async def process_conversation(messages: list[Message], tempdir: Path | None = None):
         """
-        Process the entire conversation and return a formatted string and list of files.
-        The last message is assumed to be the assistant's response.
+        Process the entire conversation and return a formatted string and list of
+        files. The last message is assumed to be the assistant's response.
         """
         conversation: list[str] = []
         files: list[Path | str] = []

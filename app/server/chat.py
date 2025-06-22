@@ -80,7 +80,7 @@ async def create_chat_completion(
         # Start a new session and concat messages into a single string
         session = client.start_chat(model=model)
         try:
-            model_input, files = await client.precess_conversation(request.messages, tmp_dir)
+            model_input, files = await client.process_conversation(request.messages, tmp_dir)
         except ValueError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         except Exception as e:
