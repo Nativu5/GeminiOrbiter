@@ -301,16 +301,15 @@ class LMDBConversationStore(metaclass=Singleton):
             return {}
 
         try:
-            with self._get_transaction(write=False) as txn:
-                stat = txn.stat(self._env._db)
-                return {
-                    "entries": stat["entries"],
-                    "page_size": stat["psize"],
-                    "depth": stat["depth"],
-                    "branch_pages": stat["branch_pages"],
-                    "leaf_pages": stat["leaf_pages"],
-                    "overflow_pages": stat["overflow_pages"],
-                }
+            stat = self._env.stat()
+            return {
+                "entries": stat["entries"],
+                "page_size": stat["psize"],
+                "depth": stat["depth"],
+                "branch_pages": stat["branch_pages"],
+                "leaf_pages": stat["leaf_pages"],
+                "overflow_pages": stat["overflow_pages"],
+            }
         except Exception as e:
             logger.error(f"Failed to get database stats: {e}")
             return {}
