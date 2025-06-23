@@ -44,7 +44,7 @@ def rotate_lmdb(path: Path, keep: str) -> None:
 
     with env.begin(write=True) as txn:
         cursor = txn.cursor()
-        for key, value in list(cursor):
+        for key, value in cursor:
             try:
                 record = orjson.loads(value)
             except orjson.JSONDecodeError:
