@@ -94,7 +94,7 @@ class SingletonGeminiClient(GeminiClient, metaclass=Singleton):
         text = ""
 
         if include_thoughts and response.thoughts:
-            text += f"<think>{response.thoughts}</think>"
+            text += f"<think>{response.thoughts}</think>\n"
 
         if response.text:
             text += response.text
