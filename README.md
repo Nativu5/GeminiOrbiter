@@ -6,13 +6,14 @@
 
 [ English | [中文](README.zh.md) ]
 
-An OpenAI-compatible API server powered by  [HanaokaYuzu/Gemini-API](https://github.com/HanaokaYuzu/Gemini-API).
+Web-based Gemini models wrapped into an OpenAI-compatible API. Powered by  [HanaokaYuzu/Gemini-API](https://github.com/HanaokaYuzu/Gemini-API).
 
 **✅ Call Gemini's web-based models via API without an API Key, completely free!**
 
 ## Features
 
 - **🔐 No Google API Key Required**: Use web cookies to freely access Gemini's models via API.
+- **🔍 Google Search Included**: Get up-to-date answers using web-based Gemini's search capabilities.
 - **💾 Conversation Persistence**: LMDB-based storage supporting multi-turn conversations.
 - **🖼️ Multi-modal Support**: Support for handling text, images, and file uploads.
 - **🔧 Flexible Configuration**: YAML-based configuration with environment variable overrides.

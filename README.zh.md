@@ -7,13 +7,14 @@
 
 [ [English](README.md) | 中文 ]
 
-兼容 OpenAI API 的 Gemini API 服务器，基于 [HanaokaYuzu/Gemini-API](https://github.com/HanaokaYuzu/Gemini-API)。
+将 Gemini 网页端模型封装为兼容 OpenAI API 的 API Server。基于 [HanaokaYuzu/Gemini-API](https://github.com/HanaokaYuzu/Gemini-API) 实现。
 
 **✅ 无需 API Key，免费通过 API 调用 Gemini 网页端模型！**
 
 ## 功能特性
 
 - 🔐 **无需 Google API Key**：只需网页 Cookie，即可免费通过 API 调用 Gemini 模型。
+- 🔍 **内置 Google 搜索**：API 已内置 Gemini 网页端的搜索能力，模型响应更加准确。
 - 💾 **会话持久化**：基于 LMDB 存储，支持多轮对话历史记录。
 - 🖼️ **多模态支持**：可处理文本、图片及文件上传。
 - 🔧 **灵活配置**：基于 YAML 配置文件，支持通过环境变量动态覆盖配置项。
