@@ -98,10 +98,11 @@ async def create_chat_completion(
 
     # Format and clean the output
     model_output = client.extract_output(response)
+    stored_output = client.extract_output(response, include_thoughts=False)
 
     # After cleaning, persist the conversation
     try:
-        last_message = Message(role="assistant", content=model_output)
+        last_message = Message(role="assistant", content=stored_output)
         conv = ConversationInStore(
             model=model.model_name,
             metadata=session.metadata,

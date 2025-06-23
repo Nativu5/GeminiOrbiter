@@ -87,13 +87,13 @@ class SingletonGeminiClient(GeminiClient, metaclass=Singleton):
         return "\n".join(conversation), files
 
     @staticmethod
-    def extract_output(response: ModelOutput):
+    def extract_output(response: ModelOutput, include_thoughts: bool = True):
         """
         Extract and format the output text from the Gemini response.
         """
         text = ""
 
-        if response.thoughts:
+        if include_thoughts and response.thoughts:
             text += f"<think>{response.thoughts}</think>"
 
         if response.text:
