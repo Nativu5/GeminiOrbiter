@@ -13,6 +13,7 @@ MAX_MSG_CHAR_LENGTH = 990000  # Max characters per message to Gemini (slightly l
 SPLIT_THRESHOLD_CHAR_LENGTH = 500000  # Split message if longer than this
 CONTINUATION_PROMPT = "\n\n(System note: The previous message was part of a longer text. Please reply with only 'OK' to acknowledge and receive the next part. Do not add any other commentary or analysis yet.)"
 ACKNOWLEDGEMENT_PHRASES = ["ok", "ok.", "okay", "okay.", "got it", "got it.", "understood", "understood."]
+XML_TOOL_CALL_SUFFIX = "\n对于任何xml工具调用命令，使用 5 个反引号的`````xml代码块包裹，避免渲染问题"
 
 
 from ..models import (
@@ -103,17 +104,32 @@ async def create_chat_completion(
         logger.debug(f"Input length: {len(model_input)}, files count: {len(files)}")
         if len(model_input) > SPLIT_THRESHOLD_CHAR_LENGTH:
             logger.info(f"Message length {len(model_input)} exceeds SPLIT_THRESHOLD_CHAR_LENGTH {SPLIT_THRESHOLD_CHAR_LENGTH}. Splitting message.")
-            input_chunks = _split_text(model_input, SPLIT_THRESHOLD_CHAR_LENGTH, MAX_MSG_CHAR_LENGTH - len(CONTINUATION_PROMPT) - 100) # -100 for safety margin
+            # Adjust max_chunk_size for _split_text to account for both prompts/suffixes
+            max_chunk_size_for_splitter = MAX_MSG_CHAR_LENGTH - len(CONTINUATION_PROMPT) - len(XML_TOOL_CALL_SUFFIX) - 100 # -100 for safety margin
+            if max_chunk_size_for_splitter <= 0: # Should not happen with reasonable suffix lengths
+                logger.error("Calculated max_chunk_size_for_splitter is too small. Check suffix lengths.")
+                max_chunk_size_for_splitter = SPLIT_THRESHOLD_CHAR_LENGTH / 2 # Fallback to a smaller size
+            input_chunks = _split_text(model_input, SPLIT_THRESHOLD_CHAR_LENGTH, max_chunk_size_for_splitter)
 
             current_files = files # Send files only with the first chunk
             for i, chunk in enumerate(input_chunks):
                 is_last_chunk = (i == len(input_chunks) - 1)
-                message_to_send = chunk
+                message_to_send = chunk + XML_TOOL_CALL_SUFFIX # Add suffix to the core content
 
                 if not is_last_chunk:
                     message_to_send += CONTINUATION_PROMPT
 
                 logger.debug(f"Sending chunk {i+1}/{len(input_chunks)} of length {len(message_to_send)}")
+                # Ensure the combined length with suffix and prompt doesn't exceed MAX_MSG_CHAR_LENGTH
+                if len(message_to_send) > MAX_MSG_CHAR_LENGTH:
+                    # This case should be rare if _split_text max_chunk_size is set correctly
+                    # considering the length of XML_TOOL_CALL_SUFFIX and CONTINUATION_PROMPT
+                    logger.warning(f"Chunk {i+1} with suffix and continuation prompt exceeds MAX_MSG_CHAR_LENGTH. Truncating. This may lead to issues.")
+                    # We might need a more sophisticated way to handle this, e.g. recalculate chunks
+                    # For now, truncate, prioritizing the start of the message.
+                    cutoff = len(message_to_send) - MAX_MSG_CHAR_LENGTH
+                    message_to_send = message_to_send[:-cutoff] # Simple truncation from the end.
+
                 response_chunk = await session.send_message(message_to_send, files=current_files)
                 current_files = [] # Clear files after first chunk
 
@@ -134,7 +150,14 @@ async def create_chat_completion(
             # Stored output should be based on the final response only
             stored_output = model_output
         else:
-            response = await session.send_message(model_input, files=files)
+            message_to_send = model_input + XML_TOOL_CALL_SUFFIX
+            if len(message_to_send) > MAX_MSG_CHAR_LENGTH:
+                # This case should be rare if initial model_input was already checked or is small
+                logger.warning(f"Single message with suffix exceeds MAX_MSG_CHAR_LENGTH. Truncating. This may lead to issues.")
+                cutoff = len(message_to_send) - MAX_MSG_CHAR_LENGTH
+                message_to_send = message_to_send[:-cutoff] # Simple truncation
+
+            response = await session.send_message(message_to_send, files=files)
             model_output = client.extract_output(response)
             stored_output = client.extract_output(response, include_thoughts=False)
 
