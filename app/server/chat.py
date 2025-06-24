@@ -13,7 +13,7 @@ MAX_MSG_CHAR_LENGTH = 990000  # Max characters per message to Gemini (slightly l
 SPLIT_THRESHOLD_CHAR_LENGTH = 500000  # Split message if longer than this
 CONTINUATION_PROMPT = "\n\n(System note: The previous message was part of a longer text. Please reply with only 'OK' to acknowledge and receive the next part. Do not add any other commentary or analysis yet.)"
 ACKNOWLEDGEMENT_PHRASES = ["ok", "ok.", "okay", "okay.", "got it", "got it.", "understood", "understood."]
-XML_TOOL_CALL_SUFFIX = "\n对于任何xml工具调用命令，使用 5 个反引号的`````xml代码块包裹，避免渲染问题"
+XML_TOOL_CALL_SUFFIX = "\nFor any XML tool call commands, please wrap them in a 5-backtick `````xml code block to avoid rendering issues."
 
 
 from ..models import (
