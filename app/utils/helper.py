@@ -16,8 +16,11 @@ def add_tag(role: str, content: str, unclose: bool = False) -> str:
 
 
 def estimate_tokens(text: str) -> int:
-    # TODO: Refactor this function to use a proper tokenizer
-    return len(text.split())
+    # Estimate tokens using the heuristic: 1 token ~ 3 characters.
+    # This is a common approximation for GPT-like models.
+    if not text:
+        return 0
+    return round(len(text) / 3)
 
 
 async def save_file_to_tempfile(
