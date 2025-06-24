@@ -4,7 +4,38 @@ from typing import Literal, Optional
 
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
-from pydantic_settings import BaseSettings, SettingsConfigDict, YamlConfigSettingsSource
+from pydantic_settings import (
+    BaseSettings,
+    EnvSettingsSource,
+    SettingsConfigDict,
+    YamlConfigSettingsSource,
+)
+
+
+def _convert_numeric_keys(value: object) -> object:
+    """Recursively convert dicts with numeric keys into lists."""
+
+    if isinstance(value, dict):
+        if all(k.isdigit() for k in value):
+            items = []
+            for idx, v in sorted(((int(k), v) for k, v in value.items()), key=lambda x: x[0]):
+                while len(items) <= idx:
+                    items.append(None)
+                items[idx] = _convert_numeric_keys(v)
+            return items
+        return {k: _convert_numeric_keys(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_convert_numeric_keys(v) for v in value]
+    return value
+
+
+class ListEnvSettingsSource(EnvSettingsSource):
+    """Env source that converts numeric keys to lists."""
+
+    def __call__(self) -> dict[str, object]:
+        raw = super().__call__()
+        return _convert_numeric_keys(raw)  # type: ignore[return-value]
+
 
 CONFIG_PATH = "config/config.yaml"
 
@@ -122,7 +153,7 @@ class Config(BaseSettings):
         file_secret_settings,
     ):
         """Read settings: env -> yaml -> default"""
-        return (env_settings, YamlConfigSettingsSource(settings_cls))
+        return (ListEnvSettingsSource(settings_cls), YamlConfigSettingsSource(settings_cls))
 
 
 def initialize_config() -> Config:
