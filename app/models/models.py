@@ -84,6 +84,7 @@ class HealthCheckResponse(BaseModel):
 
     ok: bool
     storage: Optional[Dict[str, str | int]] = None
+    clients: Optional[Dict[str, bool]] = None
     error: Optional[str] = None
 
 
@@ -95,6 +96,7 @@ class ConversationInStore(BaseModel):
 
     # NOTE: Gemini Web API do not support changing models once a conversation is created.
     model: str = Field(..., description="Model used for the conversation")
+    client_id: str = Field(..., description="Identifier of the Gemini client")
     metadata: list[str | None] = Field(
         ..., description="Metadata for Gemini API to locate the conversation"
     )

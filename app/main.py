@@ -6,19 +6,19 @@ from loguru import logger
 from .server.chat import router as chat_router
 from .server.health import router as health_router
 from .server.middleware import add_cors_middleware, add_exception_handler
-from .services.client import SingletonGeminiClient
+from .services.pool import GeminiClientPool
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        client = SingletonGeminiClient()
-        await client.init()
+        pool = GeminiClientPool()
+        await pool.init()
     except Exception as e:
-        logger.exception(f"Failed to initialize Gemini client: {e}")
+        logger.exception(f"Failed to initialize Gemini clients: {e}")
         raise
 
-    logger.info("Gemini client initialized on server startup.")
+    logger.info("Gemini clients initialized on server startup.")
     logger.info("Gemini API Server ready to serve requests.")
     yield
 

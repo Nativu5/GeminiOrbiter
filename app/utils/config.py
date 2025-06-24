@@ -20,11 +20,20 @@ class ServerConfig(BaseModel):
     )
 
 
+class GeminiClientSettings(BaseModel):
+    """Credential set for one Gemini client."""
+
+    id: str = Field(..., description="Unique identifier for the client")
+    secure_1psid: str = Field(..., description="Gemini Secure 1PSID")
+    secure_1psidts: str = Field(..., description="Gemini Secure 1PSIDTS")
+
+
 class GeminiConfig(BaseModel):
     """Gemini API configuration"""
 
-    secure_1psid: str = Field(..., description="Gemini Secure 1PSID")
-    secure_1psidts: str = Field(..., description="Gemini Secure 1PSIDTS")
+    clients: list[GeminiClientSettings] = Field(
+        ..., description="List of Gemini client credential pairs"
+    )
     timeout: int = Field(default=60, ge=1, description="Init timeout")
     auto_refresh: bool = Field(True, description="Enable auto-refresh for Gemini cookies")
     refresh_interval: int = Field(
@@ -51,7 +60,7 @@ class CORSConfig(BaseModel):
 
 class StorageConfig(BaseModel):
     path: str = Field(
-        default="data/msg.lmdb",
+        default="data/lmdb",
         description="Path to the storage directory where data will be saved",
     )
     max_size: int = Field(

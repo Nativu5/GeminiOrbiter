@@ -48,11 +48,13 @@ pip install -e .
 
 ### Configuration
 
-Edit `config/config.yaml` and set your Gemini credentials:
+Edit `config/config.yaml` and provide at least one credential pair:
 ```yaml
 gemini:
-  secure_1psid: "YOUR_SECURE_1PSID_HERE"
-  secure_1psidts: "YOUR_SECURE_1PSIDTS_HERE"
+  clients:
+    - id: "client-a"
+      secure_1psid: "YOUR_SECURE_1PSID_HERE"
+      secure_1psidts: "YOUR_SECURE_1PSIDTS_HERE"
 ```
 
 > [!NOTE]
@@ -79,8 +81,9 @@ docker run -p 8000:8000 \
   -v $(pwd)/config:/app/config \
   -v $(pwd)/data:/app/data \
   -e CONFIG_SERVER__API_KEY="your-api-key-here" \
-  -e CONFIG_GEMINI__SECURE_1PSID="your-secure-1psid" \
-  -e CONFIG_GEMINI__SECURE_1PSIDTS="your-secure-1psidts" \
+  -e CONFIG_GEMINI__CLIENTS__0__ID="client-a" \
+  -e CONFIG_GEMINI__CLIENTS__0__SECURE_1PSID="your-secure-1psid" \
+  -e CONFIG_GEMINI__CLIENTS__0__SECURE_1PSIDTS="your-secure-1psidts" \
   ghcr.io/nativu5/gemini-fastapi
 ```
 
@@ -102,8 +105,9 @@ services:
       - CONFIG_SERVER__HOST=0.0.0.0
       - CONFIG_SERVER__PORT=8000
       - CONFIG_SERVER__API_KEY=${API_KEY}
-      - CONFIG_GEMINI__SECURE_1PSID=${SECURE_1PSID}
-      - CONFIG_GEMINI__SECURE_1PSIDTS=${SECURE_1PSIDTS}
+      - CONFIG_GEMINI__CLIENTS__0__ID=client-a
+      - CONFIG_GEMINI__CLIENTS__0__SECURE_1PSID=${SECURE_1PSID}
+      - CONFIG_GEMINI__CLIENTS__0__SECURE_1PSIDTS=${SECURE_1PSIDTS}
     restart: on-failure:3 # Avoid retrying too many times
 ```
 
@@ -134,13 +138,20 @@ You can override any configuration option using environment variables with the `
 # Override server settings
 export CONFIG_SERVER__API_KEY="your-secure-api-key"
 
-# Override Gemini credentials
-export CONFIG_GEMINI__SECURE_1PSID="your-secure-1psid"
-export CONFIG_GEMINI__SECURE_1PSIDTS="your-secure-1psidts"
+# Override Gemini credentials (first client)
+export CONFIG_GEMINI__CLIENTS__0__ID="client-a"
+export CONFIG_GEMINI__CLIENTS__0__SECURE_1PSID="your-secure-1psid"
+export CONFIG_GEMINI__CLIENTS__0__SECURE_1PSIDTS="your-secure-1psidts"
 
 # Override conversation storage size limit
 export CONFIG_STORAGE__MAX_SIZE=268435456  # 256 MB
 ```
+
+### Client IDs and Conversation Reuse
+
+Conversations are stored with the ID of the client that generated them.
+Keep these identifiers stable in your configuration so that sessions remain valid
+when you update the cookie list.
 
 ### Gemini Credentials
 
