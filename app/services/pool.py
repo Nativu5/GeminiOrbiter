@@ -13,6 +13,9 @@ class GeminiClientPool:
         self._id_map: Dict[str, GeminiClientWrapper] = {}
         self._round_robin = deque()
 
+        if len(g_config.gemini.clients) == 0:
+            raise ValueError("No Gemini clients configured")
+
         for c in g_config.gemini.clients:
             client = GeminiClientWrapper(
                 client_id=c.id,

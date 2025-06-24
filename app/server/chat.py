@@ -84,9 +84,9 @@ async def create_chat_completion(
         logger.debug(f"Found reusable session: {session.metadata}")
     else:
         # Start a new session and concat messages into a single string
-        client = pool.acquire()
-        session = client.start_chat(model=model)
         try:
+            client = pool.acquire()
+            session = client.start_chat(model=model)
             model_input, files = await GeminiClientWrapper.process_conversation(
                 request.messages, tmp_dir
             )
@@ -99,7 +99,10 @@ async def create_chat_completion(
 
     # Generate response
     try:
-        logger.debug(f"Input length: {len(model_input)}, files count: {len(files)}")
+        assert session and client, "Session and client not available"
+        logger.debug(
+            f"Client ID: {client.id}, Input length: {len(model_input)}, files count: {len(files)}"
+        )
         response = await session.send_message(model_input, files=files)
     except Exception as e:
         logger.exception(f"Error generating content from Gemini API: {e}")

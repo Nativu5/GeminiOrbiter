@@ -192,7 +192,7 @@ class LMDBConversationStore(metaclass=Singleton):
                 with self._get_transaction(write=False) as txn:
                     mapped = txn.get(key.encode("utf-8"))
                     if mapped:
-                        return self.get(mapped.decode("utf-8"))
+                        return self.get(mapped.decode("utf-8"))  # type: ignore
             except Exception as e:
                 logger.error(f"Failed to retrieve messages by message list: {e}")
                 return None

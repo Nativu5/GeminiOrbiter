@@ -14,7 +14,7 @@ cors:
 
 gemini:
   clients:
-    - id: "client-a"
+    - id: "example-id-1"   # Arbitrary client ID
       secure_1psid: "YOUR_SECURE_1PSID_HERE"
       secure_1psidts: "YOUR_SECURE_1PSIDTS_HERE"
   timeout: 60              # Init timeout in seconds
