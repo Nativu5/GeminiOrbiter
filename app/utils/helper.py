@@ -16,8 +16,8 @@ def add_tag(role: str, content: str, unclose: bool = False) -> str:
 
 
 def estimate_tokens(text: str) -> int:
-    # TODO: Refactor this function to use a proper tokenizer
-    return len(text.split())
+    """Estimate the number of tokens heuristically based on character count"""
+    return int(len(text) / 3)
 
 
 async def save_file_to_tempfile(

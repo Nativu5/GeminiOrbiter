@@ -16,7 +16,9 @@ class GeminiClientWrapper(GeminiClient):
         self.id = client_id
 
     async def init(self, **kwargs):
-        # Inject default configuration values
+        """
+        Inject default configuration values.
+        """
         kwargs.setdefault("timeout", g_config.gemini.timeout)
         kwargs.setdefault("auto_refresh", g_config.gemini.auto_refresh)
         kwargs.setdefault("verbose", g_config.gemini.verbose)
@@ -67,7 +69,9 @@ class GeminiClientWrapper(GeminiClient):
         return model_input, files
 
     @staticmethod
-    async def process_conversation(messages: list[Message], tempdir: Path | None = None):
+    async def process_conversation(
+        messages: list[Message], tempdir: Path | None = None
+    ) -> tuple[str, list[Path | str]]:
         """
         Process the entire conversation and return a formatted string and list of
         files. The last message is assumed to be the assistant's response.
@@ -86,7 +90,7 @@ class GeminiClientWrapper(GeminiClient):
         return "\n".join(conversation), files
 
     @staticmethod
-    def extract_output(response: ModelOutput, include_thoughts: bool = True):
+    def extract_output(response: ModelOutput, include_thoughts: bool = True) -> str:
         """
         Extract and format the output text from the Gemini response.
         """

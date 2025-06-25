@@ -1,4 +1,5 @@
 import hashlib
+import re
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -11,16 +12,9 @@ from loguru import logger
 from ..models import ConversationInStore, Message
 from ..utils import g_config
 from ..utils.singleton import Singleton
-import re
 
-def _normalize_content(content: str) -> str:
-    """Remove <think>...</think> tags and strip whitespace from content."""
-    # Remove think tags
-    cleaned_content = re.sub(r"<think>.*?</think>\n?", "", content, flags=re.DOTALL)
-    # Strip leading/trailing whitespace
-    return cleaned_content.strip()
 
-def hash_message(message: Message) -> str:
+def _hash_message(message: Message) -> str:
     """Generate a hash for a single message."""
     # Convert message to dict and sort keys for consistent hashing
     message_dict = message.model_dump(mode="json")
@@ -28,14 +22,14 @@ def hash_message(message: Message) -> str:
     return hashlib.sha256(message_bytes).hexdigest()
 
 
-def hash_conversation(client_id: str, model: str, messages: List[Message]) -> str:
+def _hash_conversation(client_id: str, model: str, messages: List[Message]) -> str:
     """Generate a hash for a list of messages and client id."""
     # Create a combined hash from all individual message hashes
     combined_hash = hashlib.sha256()
     combined_hash.update(client_id.encode("utf-8"))
     combined_hash.update(model.encode("utf-8"))
     for message in messages:
-        message_hash = hash_message(message)
+        message_hash = _hash_message(message)
         combined_hash.update(message_hash.encode("utf-8"))
     return combined_hash.hexdigest()
 
@@ -123,7 +117,7 @@ class LMDBConversationStore(metaclass=Singleton):
             raise ValueError("Messages list cannot be empty")
 
         # Generate hash for the message list
-        message_hash = hash_conversation(conv.client_id, conv.model, conv.messages)
+        message_hash = _hash_conversation(conv.client_id, conv.model, conv.messages)
         storage_key = custom_key or message_hash
 
         # Prepare data for storage
@@ -178,23 +172,6 @@ class LMDBConversationStore(metaclass=Singleton):
             logger.error(f"Failed to retrieve messages for key {key}: {e}")
             return None
 
-    def clean_assistant_messages(self, messages: List[Message]) -> List[Message]:
-        """Create a new list of messages with assistant content cleaned."""
-        cleaned_messages = []
-        for msg in messages:
-            if msg.role == "assistant" and isinstance(msg.content, str):
-                # Create a new Message object with cleaned content
-                normalized_content = _normalize_content(msg.content)
-                # Only create a new object if content actually changed
-                if normalized_content != msg.content:
-                    cleaned_msg = Message(role=msg.role, content=normalized_content, name=msg.name)
-                    cleaned_messages.append(cleaned_msg)
-                else:
-                    cleaned_messages.append(msg)
-            else:
-                cleaned_messages.append(msg)
-        return cleaned_messages
-
     def find(self, model: str, messages: List[Message]) -> Optional[ConversationInStore]:
         """
         Search conversation data by message list.
@@ -215,7 +192,7 @@ class LMDBConversationStore(metaclass=Singleton):
             return conv
 
         # --- Find with cleaned messages ---
-        cleaned_messages = self.clean_assistant_messages(messages)
+        cleaned_messages = self.sanitize_assistant_messages(messages)
         if conv := self._find_by_message_list(model, cleaned_messages):
             logger.debug("Found conversation with cleaned message history.")
             return conv
@@ -228,14 +205,12 @@ class LMDBConversationStore(metaclass=Singleton):
     ) -> Optional[ConversationInStore]:
         """Internal find implementation based on a message list."""
         for c in g_config.gemini.clients:
-            message_hash = hash_conversation(c.id, model, messages)
+            message_hash = _hash_conversation(c.id, model, messages)
 
             key = f"{self.HASH_LOOKUP_PREFIX}{message_hash}"
             try:
                 with self._get_transaction(write=False) as txn:
-                    mapped = txn.get(key.encode("utf-8"))
-                    if mapped:
-                        logger.debug(f"Found mapped key '{mapped.decode('utf-8')}' for hash '{message_hash}'.")
+                    if mapped := txn.get(key.encode("utf-8")):  # type: ignore
                         return self.get(mapped.decode("utf-8"))  # type: ignore
             except Exception as e:
                 logger.error(
@@ -283,7 +258,7 @@ class LMDBConversationStore(metaclass=Singleton):
 
                 storage_data = orjson.loads(data)  # type: ignore
                 conv = ConversationInStore.model_validate(storage_data)
-                message_hash = hash_conversation(conv.client_id, conv.model, conv.messages)
+                message_hash = _hash_conversation(conv.client_id, conv.model, conv.messages)
 
                 # Delete main data
                 txn.delete(key.encode("utf-8"))
@@ -362,3 +337,32 @@ class LMDBConversationStore(metaclass=Singleton):
     def __del__(self):
         """Cleanup on destruction."""
         self.close()
+
+    @staticmethod
+    def remove_think_tags(text: str) -> str:
+        """
+        Remove <think>...</think> tags at the start of text and strip whitespace.
+        """
+        cleaned_content = re.sub(r"^(\s*<think>.*?</think>\n?)", "", text, flags=re.DOTALL)
+        return cleaned_content.strip()
+
+    @staticmethod
+    def sanitize_assistant_messages(messages: list[Message]) -> list[Message]:
+        """
+        Create a new list of messages with assistant content cleaned of <think> tags.
+        This is useful for store the chat history.
+        """
+        cleaned_messages = []
+        for msg in messages:
+            if msg.role == "assistant" and isinstance(msg.content, str):
+                normalized_content = LMDBConversationStore.remove_think_tags(msg.content)
+                # Only create a new object if content actually changed
+                if normalized_content != msg.content:
+                    cleaned_msg = Message(role=msg.role, content=normalized_content, name=msg.name)
+                    cleaned_messages.append(cleaned_msg)
+                else:
+                    cleaned_messages.append(msg)
+            else:
+                cleaned_messages.append(msg)
+
+        return cleaned_messages

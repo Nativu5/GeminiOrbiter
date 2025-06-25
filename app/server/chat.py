@@ -108,14 +108,14 @@ async def create_chat_completion(
         logger.exception(f"Error generating content from Gemini API: {e}")
         raise
 
-    # Format and clean the output
+    # Format the response from API
     model_output = GeminiClientWrapper.extract_output(response, include_thoughts=True)
     stored_output = GeminiClientWrapper.extract_output(response, include_thoughts=False)
 
-    # After cleaning, persist the conversation
+    # After formatting, persist the conversation to LMDB
     try:
         last_message = Message(role="assistant", content=stored_output)
-        cleaned_history = db.clean_assistant_messages(request.messages)
+        cleaned_history = db.sanitize_assistant_messages(request.messages)
         conv = ConversationInStore(
             model=model.model_name,
             client_id=client.id,
