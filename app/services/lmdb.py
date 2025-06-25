@@ -246,7 +246,7 @@ class LMDBConversationStore(metaclass=Singleton):
                 if message_hash and key != message_hash:
                     txn.delete(f"{self.HASH_LOOKUP_PREFIX}{message_hash}".encode("utf-8"))
 
-                logger.info(f"Deleted messages with key: {key}")
+                logger.debug(f"Deleted messages with key: {key}")
                 return conv
 
         except Exception as e:

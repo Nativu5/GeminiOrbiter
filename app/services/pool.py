@@ -2,16 +2,17 @@ from collections import deque
 from typing import Dict, List, Optional
 
 from ..utils import g_config
+from ..utils.singleton import Singleton
 from .client import GeminiClientWrapper
 
 
-class GeminiClientPool:
+class GeminiClientPool(metaclass=Singleton):
     """Pool of GeminiClient instances identified by unique ids."""
 
     def __init__(self) -> None:
         self._clients: List[GeminiClientWrapper] = []
         self._id_map: Dict[str, GeminiClientWrapper] = {}
-        self._round_robin = deque()
+        self._round_robin: deque[GeminiClientWrapper] = deque()
 
         if len(g_config.gemini.clients) == 0:
             raise ValueError("No Gemini clients configured")

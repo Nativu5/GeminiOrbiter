@@ -37,7 +37,7 @@ def setup_logging(
     # Setup standard logging library interceptor
     _setup_logging_intercept()
 
-    logger.info("Logger initialized.")
+    logger.debug("Logger initialized.")
 
 
 def _setup_logging_intercept() -> None:

@@ -18,8 +18,8 @@ async def lifespan(app: FastAPI):
         logger.exception(f"Failed to initialize Gemini clients: {e}")
         raise
 
-    logger.info(f"Gemini clients initialized: {[c.id for c in pool.clients]}.")
-    logger.info("Gemini API Server ready to serve requests.")
+    logger.success(f"Gemini clients initialized: {[c.id for c in pool.clients]}.")
+    logger.success("Gemini API Server ready to serve requests.")
     yield
 
 
