@@ -11,7 +11,14 @@ from loguru import logger
 from ..models import ConversationInStore, Message
 from ..utils import g_config
 from ..utils.singleton import Singleton
+import re
 
+def _normalize_content(content: str) -> str:
+    """Remove <think>...</think> tags and strip whitespace from content."""
+    # Remove think tags
+    cleaned_content = re.sub(r"<think>.*?</think>\n?", "", content, flags=re.DOTALL)
+    # Strip leading/trailing whitespace
+    return cleaned_content.strip()
 
 def hash_message(message: Message) -> str:
     """Generate a hash for a single message."""
@@ -171,6 +178,23 @@ class LMDBConversationStore(metaclass=Singleton):
             logger.error(f"Failed to retrieve messages for key {key}: {e}")
             return None
 
+    def clean_assistant_messages(self, messages: List[Message]) -> List[Message]:
+        """Create a new list of messages with assistant content cleaned."""
+        cleaned_messages = []
+        for msg in messages:
+            if msg.role == "assistant" and isinstance(msg.content, str):
+                # Create a new Message object with cleaned content
+                normalized_content = _normalize_content(msg.content)
+                # Only create a new object if content actually changed
+                if normalized_content != msg.content:
+                    cleaned_msg = Message(role=msg.role, content=normalized_content, name=msg.name)
+                    cleaned_messages.append(cleaned_msg)
+                else:
+                    cleaned_messages.append(msg)
+            else:
+                cleaned_messages.append(msg)
+        return cleaned_messages
+
     def find(self, model: str, messages: List[Message]) -> Optional[ConversationInStore]:
         """
         Search conversation data by message list.
@@ -185,16 +209,38 @@ class LMDBConversationStore(metaclass=Singleton):
         if not messages:
             return None
 
+        # --- Find with raw messages ---
+        if conv := self._find_by_message_list(model, messages):
+            logger.debug("Found conversation with raw message history.")
+            return conv
+
+        # --- Find with cleaned messages ---
+        cleaned_messages = self.clean_assistant_messages(messages)
+        if conv := self._find_by_message_list(model, cleaned_messages):
+            logger.debug("Found conversation with cleaned message history.")
+            return conv
+
+        logger.debug("No conversation found for either raw or cleaned history.")
+        return None
+
+    def _find_by_message_list(
+        self, model: str, messages: List[Message]
+    ) -> Optional[ConversationInStore]:
+        """Internal find implementation based on a message list."""
         for c in g_config.gemini.clients:
             message_hash = hash_conversation(c.id, model, messages)
+
             key = f"{self.HASH_LOOKUP_PREFIX}{message_hash}"
             try:
                 with self._get_transaction(write=False) as txn:
                     mapped = txn.get(key.encode("utf-8"))
                     if mapped:
+                        logger.debug(f"Found mapped key '{mapped.decode('utf-8')}' for hash '{message_hash}'.")
                         return self.get(mapped.decode("utf-8"))  # type: ignore
             except Exception as e:
-                logger.error(f"Failed to retrieve messages by message list for client {c.id}: {e}")
+                logger.error(
+                    f"Failed to retrieve messages by message list for hash {message_hash} and client {c.id}: {e}"
+                )
                 continue
 
             if conv := self.get(message_hash):

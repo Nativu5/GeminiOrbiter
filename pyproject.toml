@@ -11,7 +11,7 @@ dependencies = [
     "loguru>=0.7.0",
     "pydantic-settings[yaml]>=2.9.1",
     "uvicorn>=0.34.1",
-    "uvloop>=0.21.0",
+    "uvloop>=0.21.0; sys_platform != 'win32'",
 ]
 
 [project.optional-dependencies]

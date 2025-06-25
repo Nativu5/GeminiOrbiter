@@ -109,17 +109,18 @@ async def create_chat_completion(
         raise
 
     # Format and clean the output
-    model_output = GeminiClientWrapper.extract_output(response)
+    model_output = GeminiClientWrapper.extract_output(response, include_thoughts=True)
     stored_output = GeminiClientWrapper.extract_output(response, include_thoughts=False)
 
     # After cleaning, persist the conversation
     try:
         last_message = Message(role="assistant", content=stored_output)
+        cleaned_history = db.clean_assistant_messages(request.messages)
         conv = ConversationInStore(
             model=model.model_name,
             client_id=client.id,
             metadata=session.metadata,
-            messages=[*request.messages, last_message],
+            messages=[*cleaned_history, last_message],
         )
         key = db.store(conv)
         logger.debug(f"Conversation saved to LMDB with key: {key}")
