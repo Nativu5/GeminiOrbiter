@@ -15,7 +15,11 @@ from ..models import (
     ModelData,
     ModelListResponse,
 )
-from ..services import LMDBConversationStore, SingletonGeminiClient
+from ..services import (
+    GeminiClientPool,
+    GeminiClientWrapper,
+    LMDBConversationStore,
+)
 from ..utils.helper import estimate_tokens
 from .middleware import get_temp_dir, verify_api_key
 
@@ -49,7 +53,7 @@ async def create_chat_completion(
     api_key: str = Depends(verify_api_key),
     tmp_dir: Path = Depends(get_temp_dir),
 ):
-    client = SingletonGeminiClient()
+    pool = GeminiClientPool()
     db = LMDBConversationStore()
     model = Model.from_name(request.model)
 
@@ -61,10 +65,12 @@ async def create_chat_completion(
 
     # Check if conversation is reusable
     session = None
+    client = None
     if _check_reusable(request.messages):
         try:
             # Exclude the last message from user
             if old_conv := db.find(model.model_name, request.messages[:-1]):
+                client = pool.acquire(old_conv.client_id)
                 session = client.start_chat(metadata=old_conv.metadata, model=model)
         except Exception as e:
             session = None
@@ -72,15 +78,18 @@ async def create_chat_completion(
 
     if session:
         # Just send the last message to the existing session
-        model_input, files = await client.process_message(
+        model_input, files = await GeminiClientWrapper.process_message(
             request.messages[-1], tmp_dir, tagged=False
         )
         logger.debug(f"Found reusable session: {session.metadata}")
     else:
         # Start a new session and concat messages into a single string
+        client = pool.acquire()
         session = client.start_chat(model=model)
         try:
-            model_input, files = await client.process_conversation(request.messages, tmp_dir)
+            model_input, files = await GeminiClientWrapper.process_conversation(
+                request.messages, tmp_dir
+            )
         except ValueError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         except Exception as e:
@@ -97,14 +106,15 @@ async def create_chat_completion(
         raise
 
     # Format and clean the output
-    model_output = client.extract_output(response)
-    stored_output = client.extract_output(response, include_thoughts=False)
+    model_output = GeminiClientWrapper.extract_output(response)
+    stored_output = GeminiClientWrapper.extract_output(response, include_thoughts=False)
 
     # After cleaning, persist the conversation
     try:
         last_message = Message(role="assistant", content=stored_output)
         conv = ConversationInStore(
             model=model.model_name,
+            client_id=client.id,
             metadata=session.metadata,
             messages=[*request.messages, last_message],
         )

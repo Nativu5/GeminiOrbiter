@@ -6,15 +6,14 @@ from gemini_webapi import GeminiClient, ModelOutput
 from ..models import Message
 from ..utils import g_config
 from ..utils.helper import add_tag, save_file_to_tempfile, save_url_to_tempfile
-from ..utils.singleton import Singleton
 
 
-class SingletonGeminiClient(GeminiClient, metaclass=Singleton):
-    def __init__(self, **kwargs):
-        kwargs.setdefault("secure_1psid", g_config.gemini.secure_1psid)
-        kwargs.setdefault("secure_1psidts", g_config.gemini.secure_1psidts)
+class GeminiClientWrapper(GeminiClient):
+    """Gemini client with helper methods."""
 
+    def __init__(self, client_id: str, **kwargs):
         super().__init__(**kwargs)
+        self.id = client_id
 
     async def init(self, **kwargs):
         # Inject default configuration values
@@ -77,7 +76,7 @@ class SingletonGeminiClient(GeminiClient, metaclass=Singleton):
         files: list[Path | str] = []
 
         for msg in messages:
-            input_part, files_part = await SingletonGeminiClient.process_message(msg, tempdir)
+            input_part, files_part = await GeminiClientWrapper.process_message(msg, tempdir)
             conversation.append(input_part)
             files.extend(files_part)
 

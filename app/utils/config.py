@@ -20,11 +20,20 @@ class ServerConfig(BaseModel):
     )
 
 
+class GeminiClientSettings(BaseModel):
+    """Credential set for one Gemini client."""
+
+    id: str = Field(..., description="Unique identifier for the client")
+    secure_1psid: str = Field(..., description="Gemini Secure 1PSID")
+    secure_1psidts: str = Field(..., description="Gemini Secure 1PSIDTS")
+
+
 class GeminiConfig(BaseModel):
     """Gemini API configuration"""
 
-    secure_1psid: str = Field(..., description="Gemini Secure 1PSID")
-    secure_1psidts: str = Field(..., description="Gemini Secure 1PSIDTS")
+    clients: list[GeminiClientSettings] = Field(
+        ..., description="List of Gemini client credential pairs"
+    )
     timeout: int = Field(default=60, ge=1, description="Init timeout")
     auto_refresh: bool = Field(True, description="Enable auto-refresh for Gemini cookies")
     refresh_interval: int = Field(
@@ -51,7 +60,7 @@ class CORSConfig(BaseModel):
 
 class StorageConfig(BaseModel):
     path: str = Field(
-        default="data/msg.lmdb",
+        default="data/lmdb",
         description="Path to the storage directory where data will be saved",
     )
     max_size: int = Field(
@@ -125,7 +134,38 @@ def initialize_config() -> Config:
     """
     try:
         # Using environment variables and YAML file for configuration
-        return Config()  # type: ignore
+        config = Config()  # type: ignore
+
+        env_clients: list[GeminiClientSettings] | None = _load_clients_from_env()
+        if env_clients is not None:
+            config.gemini.clients = env_clients
+
+        return config
     except ValidationError as e:
         logger.error(f"Configuration validation failed: {e!s}")
         sys.exit(1)
+
+
+def _load_clients_from_env() -> list[GeminiClientSettings] | None:
+    """Load client settings from environment variables."""
+    prefix = "CONFIG_GEMINI__CLIENTS__"
+
+    env_vars = {k: v for k, v in os.environ.items() if k.startswith(prefix)}
+    if not env_vars:
+        return None
+
+    clients: dict[int, dict[str, str]] = {}
+    for key, value in env_vars.items():
+        parts = key.split("__")
+        if len(parts) < 4:
+            continue
+        index_str, field = parts[2], parts[3].lower()
+        if not index_str.isdigit():
+            continue
+        idx = int(index_str)
+        clients.setdefault(idx, {})[field] = value
+
+    if not clients:
+        return None
+
+    return [GeminiClientSettings(**clients[i]) for i in sorted(clients)]

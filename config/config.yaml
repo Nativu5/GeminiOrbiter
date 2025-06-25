@@ -13,8 +13,10 @@ cors:
   allow_headers: ["*"]
 
 gemini:
-  secure_1psid: "YOUR_SECURE_1PSID_HERE"       # Required: Gemini session cookie
-  secure_1psidts: "YOUR_SECURE_1PSIDTS_HERE"   # Required: Gemini timestamp cookie
+  clients:
+    - id: "client-a"
+      secure_1psid: "YOUR_SECURE_1PSID_HERE"
+      secure_1psidts: "YOUR_SECURE_1PSIDTS_HERE"
   timeout: 60              # Init timeout in seconds
   auto_refresh: true       # Auto-refresh session cookies
   refresh_interval: 540    # Refresh interval in seconds

@@ -49,11 +49,13 @@ pip install -e .
 
 ### 配置
 
-编辑 `config/config.yaml` 并填写 Gemini 凭证：
+编辑 `config/config.yaml` 并提供至少一组凭证：
 ```yaml
 gemini:
-  secure_1psid: "YOUR_SECURE_1PSID_HERE"
-  secure_1psidts: "YOUR_SECURE_1PSIDTS_HERE"
+  clients:
+    - id: "client-a"
+      secure_1psid: "YOUR_SECURE_1PSID_HERE"
+      secure_1psidts: "YOUR_SECURE_1PSIDTS_HERE"
 ```
 
 > [!NOTE]
@@ -80,8 +82,9 @@ docker run -p 8000:8000 \
   -v $(pwd)/config:/app/config \
   -v $(pwd)/data:/app/data \
   -e CONFIG_SERVER__API_KEY="your-api-key-here" \
-  -e CONFIG_GEMINI__SECURE_1PSID="your-secure-1psid" \
-  -e CONFIG_GEMINI__SECURE_1PSIDTS="your-secure-1psidts" \
+  -e CONFIG_GEMINI__CLIENTS__0__ID="client-a" \
+  -e CONFIG_GEMINI__CLIENTS__0__SECURE_1PSID="your-secure-1psid" \
+  -e CONFIG_GEMINI__CLIENTS__0__SECURE_1PSIDTS="your-secure-1psidts" \
   ghcr.io/nativu5/gemini-fastapi
 ```
 
@@ -103,8 +106,9 @@ services:
       - CONFIG_SERVER__HOST=0.0.0.0
       - CONFIG_SERVER__PORT=8000
       - CONFIG_SERVER__API_KEY=${API_KEY}
-      - CONFIG_GEMINI__SECURE_1PSID=${SECURE_1PSID}
-      - CONFIG_GEMINI__SECURE_1PSIDTS=${SECURE_1PSIDTS}
+      - CONFIG_GEMINI__CLIENTS__0__ID=client-a
+      - CONFIG_GEMINI__CLIENTS__0__SECURE_1PSID=${SECURE_1PSID}
+      - CONFIG_GEMINI__CLIENTS__0__SECURE_1PSIDTS=${SECURE_1PSIDTS}
     restart: on-failure:3 # 避免过多重试
 ```
 
@@ -136,12 +140,21 @@ docker compose up -d
 export CONFIG_SERVER__API_KEY="your-secure-api-key"
 
 # 覆盖 Gemini Cookie
-export CONFIG_GEMINI__SECURE_1PSID="your-secure-1psid"
-export CONFIG_GEMINI__SECURE_1PSIDTS="your-secure-1psidts"
+export CONFIG_GEMINI__CLIENTS__0__ID="client-a"
+export CONFIG_GEMINI__CLIENTS__0__SECURE_1PSID="your-secure-1psid"
+export CONFIG_GEMINI__CLIENTS__0__SECURE_1PSIDTS="your-secure-1psidts"
+
+# 也可以使用 JSON 覆盖整个列表
+# export CONFIG_GEMINI__CLIENTS='[{"id":"client-a","secure_1psid":"psid","secure_1psidts":"psidts"}]'
 
 # 覆盖对话存储大小限制
 export CONFIG_STORAGE__MAX_SIZE=268435456  # 256 MB
 ```
+
+### 客户端 ID 与会话重用
+
+会话在保存时会绑定创建它的客户端 ID。请在配置中保持这些 `id` 值稳定，
+这样在更新 Cookie 列表时依然可以复用旧会话。
 
 ### Gemini 凭据
 

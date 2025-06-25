@@ -1,7 +1,9 @@
-from .client import SingletonGeminiClient
+from .client import GeminiClientWrapper
 from .lmdb import LMDBConversationStore
+from .pool import GeminiClientPool
 
 __all__ = [
+    "GeminiClientPool",
+    "GeminiClientWrapper",
     "LMDBConversationStore",
-    "SingletonGeminiClient",
 ]

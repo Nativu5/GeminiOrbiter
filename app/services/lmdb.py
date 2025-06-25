@@ -21,10 +21,11 @@ def hash_message(message: Message) -> str:
     return hashlib.sha256(message_bytes).hexdigest()
 
 
-def hash_conversation(model: str, messages: List[Message]) -> str:
-    """Generate a hash for a list of messages."""
+def hash_conversation(client_id: str, model: str, messages: List[Message]) -> str:
+    """Generate a hash for a list of messages and client id."""
     # Create a combined hash from all individual message hashes
     combined_hash = hashlib.sha256()
+    combined_hash.update(client_id.encode("utf-8"))
     combined_hash.update(model.encode("utf-8"))
     for message in messages:
         message_hash = hash_message(message)
@@ -35,7 +36,7 @@ def hash_conversation(model: str, messages: List[Message]) -> str:
 class LMDBConversationStore(metaclass=Singleton):
     """LMDB-based storage for Message lists with hash-based key-value operations."""
 
-    CUSTOM_KEY_BINDING_PREFIX = "hash:"
+    HASH_LOOKUP_PREFIX = "hash:"
 
     def __init__(self, db_path: Optional[str] = None, max_db_size: Optional[int] = None):
         """
@@ -115,7 +116,7 @@ class LMDBConversationStore(metaclass=Singleton):
             raise ValueError("Messages list cannot be empty")
 
         # Generate hash for the message list
-        message_hash = hash_conversation(conv.model, conv.messages)
+        message_hash = hash_conversation(conv.client_id, conv.model, conv.messages)
         storage_key = custom_key or message_hash
 
         # Prepare data for storage
@@ -132,11 +133,10 @@ class LMDBConversationStore(metaclass=Singleton):
                 txn.put(storage_key.encode("utf-8"), value, overwrite=True)
 
                 # Store hash -> key mapping for reverse lookup
-                if custom_key:
-                    txn.put(
-                        f"{self.CUSTOM_KEY_BINDING_PREFIX}{message_hash}".encode("utf-8"),
-                        custom_key.encode("utf-8"),
-                    )
+                txn.put(
+                    f"{self.HASH_LOOKUP_PREFIX}{message_hash}".encode("utf-8"),
+                    storage_key.encode("utf-8"),
+                )
 
                 logger.debug(f"Stored {len(conv.messages)} messages with key: {storage_key}")
                 return storage_key
@@ -185,21 +185,21 @@ class LMDBConversationStore(metaclass=Singleton):
         if not messages:
             return None
 
-        message_hash = hash_conversation(model, messages)
-        key = f"{self.CUSTOM_KEY_BINDING_PREFIX}{message_hash}"
+        for c in g_config.gemini.clients:
+            message_hash = hash_conversation(c.id, model, messages)
+            key = f"{self.HASH_LOOKUP_PREFIX}{message_hash}"
+            try:
+                with self._get_transaction(write=False) as txn:
+                    mapped = txn.get(key.encode("utf-8"))
+                    if mapped:
+                        return self.get(mapped.decode("utf-8"))
+            except Exception as e:
+                logger.error(f"Failed to retrieve messages by message list: {e}")
+                return None
 
-        try:
-            with self._get_transaction(write=False) as txn:
-                # Try custom key binding first
-                key = txn.get(key.encode("utf-8"), default=None)
-                key = key.decode("utf-8") if key else message_hash  # type: ignore
-
-                # Fallback to hash if no custom key found
-                return self.get(key)
-
-        except Exception as e:
-            logger.error(f"Failed to retrieve messages by message list: {e}")
-            return None
+            if conv := self.get(message_hash):
+                return conv
+        return None
 
     def exists(self, key: str) -> bool:
         """
@@ -237,14 +237,14 @@ class LMDBConversationStore(metaclass=Singleton):
 
                 storage_data = orjson.loads(data)  # type: ignore
                 conv = ConversationInStore.model_validate(storage_data)
-                message_hash = hash_conversation(conv.model, conv.messages)
+                message_hash = hash_conversation(conv.client_id, conv.model, conv.messages)
 
                 # Delete main data
                 txn.delete(key.encode("utf-8"))
 
                 # Clean up hash mapping if it exists
                 if message_hash and key != message_hash:
-                    txn.delete(f"{self.CUSTOM_KEY_BINDING_PREFIX}{message_hash}".encode("utf-8"))
+                    txn.delete(f"{self.HASH_LOOKUP_PREFIX}{message_hash}".encode("utf-8"))
 
                 logger.info(f"Deleted messages with key: {key}")
                 return conv
@@ -274,7 +274,7 @@ class LMDBConversationStore(metaclass=Singleton):
                 for key, _ in cursor:
                     key_str = key.decode("utf-8")
                     # Skip internal hash mappings
-                    if key_str.startswith(self.CUSTOM_KEY_BINDING_PREFIX):
+                    if key_str.startswith(self.HASH_LOOKUP_PREFIX):
                         continue
 
                     if not prefix or key_str.startswith(prefix):
