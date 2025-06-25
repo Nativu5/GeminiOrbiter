@@ -194,8 +194,8 @@ class LMDBConversationStore(metaclass=Singleton):
                     if mapped:
                         return self.get(mapped.decode("utf-8"))  # type: ignore
             except Exception as e:
-                logger.error(f"Failed to retrieve messages by message list: {e}")
-                return None
+                logger.error(f"Failed to retrieve messages by message list for client {c.id}: {e}")
+                continue
 
             if conv := self.get(message_hash):
                 return conv
