@@ -78,8 +78,8 @@ The server will start on `http://localhost:8000` by default.
 
 ```bash
 docker run -p 8000:8000 \
-  -v $(pwd)/config:/app/config \
   -v $(pwd)/data:/app/data \
+  -v $(pwd)/cache:/app/.venv/lib/python3.12/site-packages/gemini_webapi/utils/temp \
   -e CONFIG_SERVER__API_KEY="your-api-key-here" \
   -e CONFIG_GEMINI__CLIENTS__0__ID="client-a" \
   -e CONFIG_GEMINI__CLIENTS__0__SECURE_1PSID="your-secure-1psid" \
@@ -98,7 +98,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./config:/app/config
+      # - ./config:/app/config  # Uncomment to use a custom config file
       - ./data:/app/data
       - ./cache:/app/.venv/lib/python3.12/site-packages/gemini_webapi/utils/temp
     environment:
