@@ -172,7 +172,13 @@ async def create_chat_completion(
     completion_id = f"chatcmpl-{uuid.uuid4()}"
     timestamp = int(datetime.now(tz=timezone.utc).timestamp())
     if request.stream:
-        return _create_streaming_response(model_output, completion_id, timestamp, request.model)
+        return _create_streaming_response(
+            model_output,
+            completion_id,
+            timestamp,
+            request.model,
+            request.messages,
+        )
     else:
         return _create_standard_response(
             model_output, completion_id, timestamp, request.model, request.messages
@@ -229,9 +235,18 @@ def _find_reusable_session(
 
 
 def _create_streaming_response(
-    model_output: str, completion_id: str, created_time: int, model: str
+    model_output: str,
+    completion_id: str,
+    created_time: int,
+    model: str,
+    messages: list[Message],
 ) -> StreamingResponse:
-    """Create streaming response"""
+    """Create streaming response with `usage` calculation included in the final chunk."""
+
+    # Calculate token usage
+    prompt_tokens = sum(estimate_tokens(msg.content) for msg in messages)
+    completion_tokens = estimate_tokens(model_output)
+    total_tokens = prompt_tokens + completion_tokens
 
     async def generate_stream():
         # Send start event
@@ -264,6 +279,11 @@ def _create_streaming_response(
             "created": created_time,
             "model": model,
             "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+            },
         }
         yield f"data: {orjson.dumps(data).decode('utf-8')}\n\n"
         yield "data: [DONE]\n\n"
