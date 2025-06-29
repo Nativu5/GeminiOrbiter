@@ -44,6 +44,11 @@ class GeminiConfig(BaseModel):
         default=540, ge=1, description="Interval in seconds to refresh Gemini cookies"
     )
     verbose: bool = Field(False, description="Enable verbose logging for Gemini API requests")
+    max_chars_per_request: int = Field(
+        default=1_000_000,
+        ge=1,
+        description="Maximum characters Gemini Web can accept per request",
+    )
 
 
 class CORSConfig(BaseModel):

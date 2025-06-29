@@ -43,7 +43,12 @@ class GeminiClientWrapper(GeminiClient):
             # TODO: Use Pydantic to enforce the value checking
             for item in message.content:
                 if item.type == "text":
-                    model_input = item.text or ""
+                    # Append multiple text fragments
+                    if item.text:
+                        if model_input:
+                            model_input += "\n" + item.text
+                        else:
+                            model_input = item.text
 
                 elif item.type == "image_url":
                     if not item.image_url:
@@ -66,6 +71,8 @@ class GeminiClientWrapper(GeminiClient):
         if model_input and tagged:
             model_input = add_tag(message.role, model_input)
 
+        if "<" in model_input and ">" in model_input:
+            model_input += "\nFor any xml block, e.g. tool call, always wrap it by: \n`````xml\n...\n`````\n"
         return model_input, files
 
     @staticmethod
@@ -76,16 +83,25 @@ class GeminiClientWrapper(GeminiClient):
         Process the entire conversation and return a formatted string and list of
         files. The last message is assumed to be the assistant's response.
         """
+        # Determine once whether we need to wrap messages with role tags: only required
+        # if the history already contains assistant/system messages. When every message
+        # so far is from the user, we can skip tagging entirely.
+        need_tag = any(m.role not in ("user", "system") for m in messages)
+
         conversation: list[str] = []
         files: list[Path | str] = []
 
         for msg in messages:
-            input_part, files_part = await GeminiClientWrapper.process_message(msg, tempdir)
+            input_part, files_part = await GeminiClientWrapper.process_message(
+                msg, tempdir, tagged=need_tag
+            )
             conversation.append(input_part)
             files.extend(files_part)
 
-        # Left with the last message as the assistant's response
-        conversation.append(add_tag("assistant", "", unclose=True))
+        # Append an opening assistant tag only when we used tags above so that Gemini
+        # knows where to start its reply.
+        if need_tag:
+            conversation.append(add_tag("assistant", "", unclose=True))
 
         return "\n".join(conversation), files
 
