@@ -71,6 +71,8 @@ class GeminiClientWrapper(GeminiClient):
         if model_input and tagged:
             model_input = add_tag(message.role, model_input)
 
+        if "<" in model_input and ">" in model_input:
+            model_input += "\nFor any xml block, e.g. tool call, always wrap it by: \n`````xml\n...\n`````\n"
         return model_input, files
 
     @staticmethod
