@@ -20,6 +20,7 @@ from ..services import (
     GeminiClientWrapper,
     LMDBConversationStore,
 )
+from ..utils import g_config
 from ..utils.helper import estimate_tokens
 from .middleware import get_temp_dir, verify_api_key
 
@@ -97,13 +98,53 @@ async def create_chat_completion(
             raise
         logger.debug("New session started.")
 
+    # Maximum characters Gemini Web can accept in a single request (configurable)
+    MAX_CHARS_PER_REQUEST = int(g_config.gemini.max_chars_per_request * 0.9)
+
+    async def _send_with_split(session, text: str, files: list[Path | str] | None = None):
+        """Send text to Gemini, automatically splitting into multiple batches if it is
+        longer than ``MAX_CHARS_PER_REQUEST``.
+
+        Every intermediate batch (that is **not** the last one) is suffixed with a hint
+        telling Gemini that more content will come, and it should simply reply with
+        "ok". The final batch carries any file uploads and the real user prompt so
+        that Gemini can produce the actual answer.
+        """
+        if len(text) <= MAX_CHARS_PER_REQUEST:
+            # No need to split – a single request is fine.
+            return await session.send_message(text, files=files)
+
+        chunks: list[str] = []
+        pos = 0
+        total = len(text)
+        while pos < total:
+            end = min(pos + MAX_CHARS_PER_REQUEST, total)
+            chunk = text[pos:end]
+            pos = end
+
+            # If this is NOT the last chunk, add the continuation hint.
+            if end < total:
+                chunk += "\n(More messages to come, please reply with just 'ok'.)"
+            chunks.append(chunk)
+
+        # Fire off all but the last chunk, discarding the interim "ok" replies.
+        for chk in chunks[:-1]:
+            try:
+                await session.send_message(chk)
+            except Exception as e:
+                logger.exception(f"Error sending chunk to Gemini: {e}")
+                raise
+
+        # The last chunk carries the files (if any) and we return its response.
+        return await session.send_message(chunks[-1], files=files)
+
     # Generate response
     try:
         assert session and client, "Session and client not available"
         logger.debug(
             f"Client ID: {client.id}, Input length: {len(model_input)}, files count: {len(files)}"
         )
-        response = await session.send_message(model_input, files=files)
+        response = await _send_with_split(session, model_input, files=files)
     except Exception as e:
         logger.exception(f"Error generating content from Gemini API: {e}")
         raise
