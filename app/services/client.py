@@ -83,16 +83,25 @@ class GeminiClientWrapper(GeminiClient):
         Process the entire conversation and return a formatted string and list of
         files. The last message is assumed to be the assistant's response.
         """
+        # Determine once whether we need to wrap messages with role tags: only required
+        # if the history already contains assistant/system messages. When every message
+        # so far is from the user, we can skip tagging entirely.
+        need_tag = any(m.role not in ("user", "system") for m in messages)
+
         conversation: list[str] = []
         files: list[Path | str] = []
 
         for msg in messages:
-            input_part, files_part = await GeminiClientWrapper.process_message(msg, tempdir)
+            input_part, files_part = await GeminiClientWrapper.process_message(
+                msg, tempdir, tagged=need_tag
+            )
             conversation.append(input_part)
             files.extend(files_part)
 
-        # Left with the last message as the assistant's response
-        conversation.append(add_tag("assistant", "", unclose=True))
+        # Append an opening assistant tag only when we used tags above so that Gemini
+        # knows where to start its reply.
+        if need_tag:
+            conversation.append(add_tag("assistant", "", unclose=True))
 
         return "\n".join(conversation), files
 
