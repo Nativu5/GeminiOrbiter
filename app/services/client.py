@@ -43,7 +43,12 @@ class GeminiClientWrapper(GeminiClient):
             # TODO: Use Pydantic to enforce the value checking
             for item in message.content:
                 if item.type == "text":
-                    model_input = item.text or ""
+                    # Append multiple text fragments
+                    if item.text:
+                        if model_input:
+                            model_input += "\n" + item.text
+                        else:
+                            model_input = item.text
 
                 elif item.type == "image_url":
                     if not item.image_url:
