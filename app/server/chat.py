@@ -175,7 +175,7 @@ async def create_chat_completion(
         return _create_streaming_response(model_output, completion_id, timestamp, request.model)
     else:
         return _create_standard_response(
-            model_output, completion_id, timestamp, request.model, model_input
+            model_output, completion_id, timestamp, request.model, request.messages
         )
 
 # --- Helper to find reusable session with partial history ---
@@ -272,11 +272,15 @@ def _create_streaming_response(
 
 
 def _create_standard_response(
-    model_output: str, completion_id: str, created_time: int, model: str, model_input: str
+    model_output: str,
+    completion_id: str,
+    created_time: int,
+    model: str,
+    messages: list[Message],
 ) -> dict:
     """Create standard response"""
     # Calculate token usage
-    prompt_tokens = estimate_tokens(model_input)
+    prompt_tokens = sum(estimate_tokens(msg.content) for msg in messages)
     completion_tokens = estimate_tokens(model_output)
     total_tokens = prompt_tokens + completion_tokens
 
